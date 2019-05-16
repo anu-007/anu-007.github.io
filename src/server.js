@@ -7,6 +7,7 @@
  const { StringDecoder } = require('string_decoder');
  const config = require('../config/default');
  const handler = require('./handler');
+ const helpers = require('./helpers');
 
  //container for server
  const server = {};
@@ -48,7 +49,7 @@
 
         const data = {
             trimmedPath,
-            querystring,
+            querystringObject,
             method,
             headers,
             payload: helpers.parseJsonToObject(buffer)
@@ -60,6 +61,7 @@
                 console.log(payload);
             });
         } catch(err) {
+            debug(err);
             console.log(err);
         }
     });
@@ -67,7 +69,9 @@
 
  //defining the request router
  server.router = {
-    '': handler.index
+    '': handler.index,
+    'session/create': handler.createSession,
+    'session/delete': handler.deleteSession
  };
 
  //initiate a server instance
