@@ -71,7 +71,9 @@
  server.router = {
     '': handler.index,
     'session/create': handler.createSession,
-    'session/delete': handler.deleteSession
+    'session/delete': handler.deleteSession,
+    'api/users': handler.users,
+    'api/tokens': handlers.tokens,
  };
 
  //initiate a server instance
