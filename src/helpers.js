@@ -1,6 +1,9 @@
 /**
  * helpers and utility
  */
+const crypto = require('crypto');
+
+const config = require('../config/default');
 
 //containers for helpers
 const helpers = {};

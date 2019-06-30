@@ -3,7 +3,6 @@
  */
 const _data = require('./data');
 const helpers = require('./helpers');
-const showdown = require('https://cdn.rawgit.com/showdownjs/showdown/<version tag>/dist/showdown.min.js');
 
 // define handlers
 const handlers = {};
@@ -28,7 +27,7 @@ handlers._users = {};
 //reqiore data : phone
 //optional data : none
 handlers._users.get = function(data, callback) {
-    const userName = typeof(data.queryStringObj.userName) == 'string' && data.queryStringObj.userName.trim().length == 12 ? data.queryStringObj.userName.trim() : false;
+    const userName = typeof(data.queryStringObject.userName) == 'string' && data.queryStringObject.userName.trim().length > 0 ? data.queryStringObject.userName.trim() : false;
     if(userName) {
         const token = typeof(data.headers.token) == 'string' ? data.headers.token : false;
         handlers._tokens.verifyToken(token, userName, function(tokenValid) {
@@ -103,7 +102,7 @@ handlers._users.put = function(data, callback) {
     const password = typeof(data.payload.password) == 'string' && data.payload.password.trim().length > 0 ? data.payload.password.trim() : false;
 
     if(userName) {
-        if(firstName && lastName && password) {
+        if(firstName || lastName || password) {
             const token = typeof(data.headers.token) == 'string' ? data.headers.token : false;
             handlers._tokens.verifyToken(token, userName, function(tokenValid) {
                 if(tokenValid) {
@@ -118,7 +117,7 @@ handlers._users.put = function(data, callback) {
                             if(password) {
                                 userData.password = helpers.hash(password);
                             }
-                            _data.update('users', userObj, function(err, data) {
+                            _data.update('users', userName, userObj, function(err, data) {
                                 if(!err) {
                                     callback(200);
                                 } else {
@@ -145,10 +144,10 @@ handlers._users.put = function(data, callback) {
 //users - delete
 //required fields: phone
 handlers._users.delete = function(data, callback) {
-    const userName = typeof(body.payload.userName) == 'string' && data.payload.userName.trim().length > 0 ? data.payload.userName.trim() : false;
+    const userName = typeof(data.queryStringObject.userName) == 'string' && data.queryStringObject.userName.trim().length > 0 ? data.queryStringObject.userName.trim() : false;
     if(userName) {
         const token = typeof(data.headers.token) == 'string' ? data.headers.token : false;
-        handlers._tokens.verifyToken(token, phone, function(tokenIsValid) {
+        handlers._tokens.verifyToken(token, userName, function(tokenIsValid) {
             if(tokenIsValid) {
                 _data.read('users', userName, function(err, userObj) {
                     if(!err && userObj) {
@@ -213,7 +212,7 @@ handlers._users.delete = function(data, callback) {
 };
 
 //tokens
-handlers.token = function(data, callback) {
+handlers.tokens = function(data, callback) {
     const acceptableMethods = ['post', 'get', 'put', 'delete'];
     if(acceptableMethods.indexOf(data.method.toLowerCase()) > -1) {
         handlers._tokens[data.method.toLowerCase()](data,callback);
@@ -235,13 +234,13 @@ handlers._tokens.post = function(data, callback) {
         _data.read('users', userName, function(err, userData) {
             if(!err && userData) {
                 const hashedPassword = helpers.hash(password);
-                if(hashedPassword == userData.password) {
+                if(hashedPassword == userData.hashedPassword) {
                     const tokenId = helpers.createRandomString(20);
                     const expires = Date.now() + 1000*60*60;
                     const tokenObject = {
                         'userName': userName,
                         'id': tokenId,
-                        'expiry': expires
+                        'expires': expires
                     };
 
                     _data.create('tokens', tokenId, tokenObject, function(err) {
@@ -268,7 +267,7 @@ handlers._tokens.post = function(data, callback) {
 //required data: id
 //optional data: none
 handlers._tokens.get = function(data, callback) {
-    const id = typeof(data.queryStringObj.id) == 'string' && data.queryStringObj.id.trim().length == 20 ? data.queryStringObj.id.trim() : false;
+    const id = typeof(data.queryStringObject.id) == 'string' && data.queryStringObject.id.trim().length == 20 ? data.queryStringObject.id.trim() : false;
     if(id) {
         _data.read('tokens', id, function(err, tokenData) {
             if(!err && tokenData) {
@@ -285,7 +284,7 @@ handlers._tokens.get = function(data, callback) {
 // tokens -put
 //required data: id, extend
 //optional data: none
-handlers._tokens.put = function(err, callback) {
+handlers._tokens.put = function(data, callback) {
     const id = typeof(data.payload.id) == 'string' && data.payload.id.trim().length == 20 ? data.payload.id.trim() : false;
     const extend = typeof(data.payload.extend) == 'boolean' && data.payload.extend == true ? true : false;
     if(id && extend) {
@@ -315,7 +314,7 @@ handlers._tokens.put = function(err, callback) {
 // tokens -delete
 //required data: id
 //optional data: none
-handlers._tokens.delete = function(err, callback) {
+handlers._tokens.delete = function(data, callback) {
     const id = typeof(data.queryStringObject.id) == 'string' && data.queryStringObject.id.trim().length == 20 ? data.queryStringObject.id.trim() : false;
     if(id) {
         _data.read('tokens', id, function(err, tokenData) {
@@ -338,7 +337,7 @@ handlers._tokens.delete = function(err, callback) {
 
 //verify if a given token id is currently valid for a given user
 handlers._tokens.verifyToken = function(id, userName, callback) {
-    _data.read('tokes', id, function(err, tokenData) {
+    _data.read('tokens', id, function(err, tokenData) {
         if(!err && tokenData) {
             if(tokenData.userName == userName && tokenData.expires > Date.now()) {
                 callback(true);
@@ -378,7 +377,7 @@ handlers._notes.post = function(data, callback) {
                 const userName = tokenData.userName;
                 _data.read('users', userName, function(err, userObj) {
                     if(!err && userObj) {
-                        const userNotes = typeof(userData.notes) == 'object' && userObj.notes instanceof Array ? userObj.notes : false;
+                        const userNotes = typeof(userObj.notes) == 'object' && userObj.notes instanceof Array ? userObj.notes : [];
                         const noteId = helpers.createRandomString(20);
                         
                         const notesObj = {
@@ -390,7 +389,7 @@ handlers._notes.post = function(data, callback) {
                             tags
                         };
 
-                        _data.create('notes', notesObj, function(err) {
+                        _data.create('notes', noteId, notesObj, function(err) {
                             if(!err) {
                                 userObj.notes = userNotes;
                                 userObj.notes.push(noteId);
@@ -442,7 +441,7 @@ handlers._notes.put = function(data, callback) {
                             }
 
                             _data.update('notes', id, notesData, function(err) {
-                                if(err) {
+                                if(!err) {
                                     callback(200);
                                 } else {
                                     callback(500, {'Error': 'could not update the note'});
@@ -468,9 +467,9 @@ handlers._notes.put = function(data, callback) {
 // required data - id
 // optional data - none
 handlers._notes.get = function(data, callback) {
-    const id = typeof(data.queryStringObj.id) == 'string' && data.queryStringObj.id.trim().length == 20 ? data.queryStringObj.id.trim() : false;
+    const id = typeof(data.queryStringObject.id) == 'string' && data.queryStringObject.id.trim().length == 20 ? data.queryStringObject.id.trim() : false;
     if(id) {
-        _data.read('notes', id, function(notesData) {
+        _data.read('notes', id, function(err, notesData) {
             if(!err && notesData) {
                 const token = typeof(data.headers.token) == 'string' ? data.headers.token : false;
 
@@ -505,7 +504,7 @@ handlers._notes.delete = function(data, callback) {
                     if(tokenIsValid) {
                         _data.delete('notes', id, function(err) {
                             if(!err) {
-                                _data.read('users', checkData.userPhone, function(err, userData) {
+                                _data.read('users', notesData.userName, function(err, userData) {
                                     if(!err && userData) {
                                         const userNotes = typeof(userData.notes) == 'object' && userData.notes instanceof Array ? userData.notes : [];
                                         const notePosition = userNotes.indexOf(id);
@@ -560,7 +559,7 @@ handlers._cards = {};
 //optional data - none
 handlers._cards.post = function(data, callback) {
     const question = typeof(data.payload.question) == 'string' && data.payload.question.trim().length > 0 ? data.payload.question.trim() : false;
-    const answer = typeof(data.payload.answer) == 'string' && data.payload.answer.trim().length > 0 ? dagta.payload.answer.trim() : false;
+    const answer = typeof(data.payload.answer) == 'string' && data.payload.answer.trim().length > 0 ? data.payload.answer.trim() : false;
 
     if(question && answer) {
         const token = typeof(data.headers.token) == 'string' ? data.headers.token : false;
@@ -569,18 +568,19 @@ handlers._cards.post = function(data, callback) {
                 const userName = tokenData.userName;
                 _data.read('users', userName, function(err, userObj) {
                     if(!err && userObj) {
-                        const userCards = typeof(userData.cards) == 'object' && userObj.cards instanceof Array ? userObj.cards : false;
+                        const userCards = typeof(userObj.cards) == 'object' && userObj.cards instanceof Array ? userObj.cards : [];
                         const cardId = helpers.createRandomString(20);
                         
                         const cardObj = {
                             id: cardId,
                             question,
+                            userName,
                             answer,
                             dateCreated: new Date(),
                             dateUpdated: new Date()
                         };
 
-                        _data.create('cards', cardObj, function(err) {
+                        _data.create('cards', cardId, cardObj, function(err) {
                             if(!err) {
                                 userObj.cards = userCards;
                                 userObj.cards.push(cardId);
@@ -615,7 +615,7 @@ handlers._cards.post = function(data, callback) {
 handlers._cards.put = function(data, callback) {
     const id = typeof(data.payload.id) == 'string' && data.payload.id.trim().length == 20 ? data.payload.id.trim() : false;
     const question = typeof(data.payload.question) == 'string' && data.payload.question.trim().length > 0 ? data.payload.question.trim() : false;
-    const answer = typeof(data.payload.answer) == 'object' && data.payload.answer instanceof Array && data.payload.answer.length > 0 ? data.payload.answer : false;
+    const answer = typeof(data.payload.answer) == 'string' && data.payload.answer.trim().length > 0 ? data.payload.answer.trim() : false;
 
     if(id) {
         if(question || answer) {
@@ -632,7 +632,7 @@ handlers._cards.put = function(data, callback) {
                             }
 
                             _data.update('cards', id, cardsData, function(err) {
-                                if(err) {
+                                if(!err) {
                                     callback(200);
                                 } else {
                                     callback(500, {'Error': 'could not update the card'});
@@ -658,12 +658,11 @@ handlers._cards.put = function(data, callback) {
 // required data - id
 // optional data - none
 handlers._cards.get = function(data, callback) {
-    const id = typeof(data.queryStringObj.id) == 'string' && data.queryStringObj.id.trim().length == 20 ? data.queryStringObj.id.trim() : false;
+    const id = typeof(data.queryStringObject.id) == 'string' && data.queryStringObject.id.trim().length == 20 ? data.queryStringObject.id.trim() : false;
     if(id) {
-        _data.read('cards', id, function(cardsData) {
+        _data.read('cards', id, function(err, cardsData) {
             if(!err && cardsData) {
                 const token = typeof(data.headers.token) == 'string' ? data.headers.token : false;
-
                 handlers._tokens.verifyToken(token, cardsData.userName, function(tokenIsValid) {
                     if(tokenIsValid) {
                         callback(200, cardsData);
@@ -694,7 +693,7 @@ handlers._cards.delete = function(data, callback) {
                     if(tokenIsValid) {
                         _data.delete('cards', id, function(err) {
                             if(!err) {
-                                _data.read('users', checkData.userPhone, function(err, userData) {
+                                _data.read('users', cardsData.userName, function(err, userData) {
                                     if(!err && userData) {
                                         const usercards = typeof(userData.cards) == 'object' && userData.cards instanceof Array ? userData.cards : [];
                                         const cardPosition = usercards.indexOf(id);

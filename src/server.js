@@ -6,7 +6,7 @@
  const url = require('url');
  const { StringDecoder } = require('string_decoder');
  const config = require('../config/default');
- const handler = require('./handler');
+ const handlers = require('./handler');
  const helpers = require('./helpers');
 
  //container for server
@@ -26,7 +26,7 @@
     const trimmedPath = path.replace(/^\/+|\/+$/g,'');
 
     //get querystring object
-    const querystringObject = parsedUrl.query;
+    const queryStringObject = parsedUrl.query;
 
     //get the method
     const method = req.method;
@@ -45,11 +45,11 @@
     req.on('end', _=> {
         buffer += decoder.end();
         //choose the handler this request to go to, if not found use not found handler
-        const chooseHandler = typeof(server.router[trimmedPath]) != 'undefined' ? server.router[trimmedPath] : handler.notFound;
+        const chooseHandler = typeof(server.router[trimmedPath]) != 'undefined' ? server.router[trimmedPath] : handlers.notFound;
 
         const data = {
             trimmedPath,
-            querystringObject,
+            queryStringObject,
             method,
             headers,
             payload: helpers.parseJsonToObject(buffer)
@@ -58,22 +58,25 @@
         //route the request to the handler specified in the router
         try {
             chooseHandler(data, function(status, payload, contentType) {
-                console.log(payload);
+                res.writeHead(status);
+                res.end(JSON.stringify(payload));
             });
         } catch(err) {
-            debug(err);
-            console.log(err);
+            // debug(err);
+            res.end(JSON.stringify(err));
         }
     });
  };
 
  //defining the request router
  server.router = {
-    '': handler.index,
-    'session/create': handler.createSession,
-    'session/delete': handler.deleteSession,
-    'api/users': handler.users,
+    '': handlers.index,
+    'session/create': handlers.createSession,
+    'session/delete': handlers.deleteSession,
+    'api/users': handlers.users,
     'api/tokens': handlers.tokens,
+    'api/notes': handlers.notes,
+    'api/cards': handlers.cards
  };
 
  //initiate a server instance

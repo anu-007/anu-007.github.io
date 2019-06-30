@@ -4,7 +4,8 @@ const enviroment = {};
 enviroment.development = {
     envName: 'development',
     httpPort: 3000,
-    host: '127.0.0.1'
+    host: '127.0.0.1',
+    hashingSecret: 'this is a secret'
 };
 
 //check for current enviroment
